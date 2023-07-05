@@ -13,7 +13,8 @@ public class DropSelectTypePipeline {
 
     private static DropSelectTypePipeline instance;
 
-    private DropSelectTypePipeline() {}
+    private DropSelectTypePipeline() {
+    }
 
     public static DropSelectTypePipeline getInstance() {
         if (instance == null) {
@@ -24,6 +25,12 @@ public class DropSelectTypePipeline {
 
     private static final Random random = new SecureRandom();
 
+    /**
+     * It removes one property, it may remove another property with 50% chance and it may change the type of another property with 90% chance
+     *
+     * @param schema
+     * @param spec
+     */
     public void apply(Schema<?> schema, OpenAPI spec) {
         DropRule.getInstance().apply(schema, spec);
         if (random.nextDouble() > 0.5) {

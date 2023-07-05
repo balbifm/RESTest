@@ -1,0 +1,20 @@
+---
+auth:
+  required: true
+  queryParams: {}
+  headerParams: {}
+  apiKeysPath: null
+  headersPath: null
+  oauthPath: null
+testConfiguration:
+  operations:
+  - testPath: /headers
+    operationId: getHeaders
+    method: get
+    testParameters: null
+    expectedResponse: 200
+  - testPath: /anything
+    operationId: getAnything
+    method: get
+    testParameters: null
+    expectedResponse: 200

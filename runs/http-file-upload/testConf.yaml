@@ -1,0 +1,32 @@
+---
+auth:
+  required: true
+  queryParams: {}
+  headerParams: {}
+  apiKeysPath: null
+  headersPath: null
+  oauthPath: null
+testConfiguration:
+  operations:
+  - testPath: /anything
+    operationId: http-anything-get
+    method: get
+    testParameters: null
+    expectedResponse: 200
+  - testPath: /anything
+    operationId: http-anything-post
+    method: post
+    testParameters:
+    - name: file
+      in: formData
+      weight: 0.5
+      generators:
+      - type: RandomInputValue
+        genParameters:
+        - name: values
+          values:
+          - path/to/file
+          - path/to/another/file
+          objectValues: null
+        valid: true
+    expectedResponse: 200

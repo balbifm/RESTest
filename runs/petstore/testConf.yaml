@@ -1,0 +1,81 @@
+---
+auth:
+  required: true
+  queryParams: {}
+  headerParams: {}
+  apiKeysPath: null
+  headersPath: null
+  oauthPath: null
+testConfiguration:
+  operations:
+  - testPath: /pet/findByStatus
+    operationId: findPetsByStatus
+    method: get
+    testParameters:
+    - name: status
+      in: query
+      weight: null
+      generators:
+      - type: RandomInputValue
+        genParameters:
+        - name: values
+          values:
+          - available
+          - pending
+          - sold
+          objectValues: null
+        valid: true
+    - name: client_id
+      in: header
+      weight: null
+      generators:
+      - type: RandomRegExp
+        genParameters:
+        - name: regExp
+          values:
+          - "^[a-zA-Z0-9!@#\\$%\\^&\\*\\(\\)\\-_\\+=\\[\\]\\{\\}\\\\\\|:;'\",\\.<>\\\
+            /\\?~`]*$"
+          objectValues: null
+        valid: true
+    - name: client_secret
+      in: header
+      weight: null
+      generators:
+      - type: RandomRegExp
+        genParameters:
+        - name: regExp
+          values:
+          - "^[a-zA-Z0-9!@#\\$%\\^&\\*\\(\\)\\-_\\+=\\[\\]\\{\\}\\\\\\|:;'\",\\.<>\\\
+            /\\?~`]*$"
+          objectValues: null
+        valid: true
+    expectedResponse: 200
+  - testPath: /store/inventory
+    operationId: getInventory
+    method: get
+    testParameters:
+    - name: client_id
+      in: header
+      weight: null
+      generators:
+      - type: RandomRegExp
+        genParameters:
+        - name: regExp
+          values:
+          - "^[a-zA-Z0-9!@#\\$%\\^&\\*\\(\\)\\-_\\+=\\[\\]\\{\\}\\\\\\|:;'\",\\.<>\\\
+            /\\?~`]*$"
+          objectValues: null
+        valid: true
+    - name: client_secret
+      in: header
+      weight: null
+      generators:
+      - type: RandomRegExp
+        genParameters:
+        - name: regExp
+          values:
+          - "^[a-zA-Z0-9!@#\\$%\\^&\\*\\(\\)\\-_\\+=\\[\\]\\{\\}\\\\\\|:;'\",\\.<>\\\
+            /\\?~`]*$"
+          objectValues: null
+        valid: true
+    expectedResponse: 200

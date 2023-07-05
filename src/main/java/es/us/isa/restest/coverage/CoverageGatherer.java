@@ -17,10 +17,12 @@ import static es.us.isa.restest.specification.OpenAPISpecificationVisitor.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -28,7 +30,7 @@ import java.util.stream.Collectors;
 /**
  * Given an OpenAPI specification, obtain coverage level needed to reach 100% for
  * each criterion (both input and output criteria)
- * 
+ *
  * @author Alberto Martin-Lopez
  */
 public class CoverageGatherer {
@@ -94,13 +96,13 @@ public class CoverageGatherer {
      * for the operations criterion, it iterates over all paths; for the parameter values
      * criterion, it iterates over all paths, operations of those paths and parameters of those
      * operations.
-     * 
+     *
      * @param type {@link CriterionType} to consider for the creation of {@link CoverageCriterion}s
      * @return A list containing all coverage criteria that could be created for that type
      */
     private List<CoverageCriterion> getCoverageCriteria(CriterionType type) {
         List<CoverageCriterion> criteria = new ArrayList<>(); // list of criteria to be returned
-        
+
         if (type == PATH) {
             List<String> pathsList = new ArrayList<>(spec.getSpecification().getPaths().keySet()); // list of paths per criterion
             criteria.add(createCriterion(pathsList, PATH, ""));
@@ -180,21 +182,21 @@ public class CoverageGatherer {
     private void getParameterCoverageCriteria(List<CoverageCriterion> criteria, Entry<String, PathItem> currentPathEntry, Entry<HttpMethod, Operation> currentOperationEntry, RequestBody requestBody) {
         List<String> parametersList = new ArrayList<>(); // list of parameters per criterion
 
-        if(currentOperationEntry.getValue().getParameters() != null) {
+        if (currentOperationEntry.getValue().getParameters() != null) {
             for (Parameter parameter : currentOperationEntry.getValue().getParameters()) { // collect query, path and header parameters for this operation
                 parametersList.add(parameter.getName()); // add parameter name
             }
         }
 
-        if(requestBody != null && requestBody.getContent().keySet().stream().anyMatch(x -> x.matches(MEDIA_TYPE_APPLICATION_JSON_REGEX))) { //if request body is not null and accepts application/json
+        if (requestBody != null && requestBody.getContent().keySet().stream().anyMatch(x -> x.matches(MEDIA_TYPE_APPLICATION_JSON_REGEX))) { //if request body is not null and accepts application/json
             parametersList.add("body"); //add body parameter
-        } else if(requestBody != null && (requestBody.getContent().containsKey(MEDIA_TYPE_APPLICATION_X_WWW_FORM_URLENCODED) || (requestBody.getContent().containsKey(MEDIA_TYPE_MULTIPART_FORM_DATA)))) {
+        } else if (requestBody != null && (requestBody.getContent().containsKey(MEDIA_TYPE_APPLICATION_X_WWW_FORM_URLENCODED) || (requestBody.getContent().containsKey(MEDIA_TYPE_MULTIPART_FORM_DATA)))) {
 
             MediaType mediaType = requestBody.getContent().containsKey(MEDIA_TYPE_APPLICATION_X_WWW_FORM_URLENCODED) ?
                     requestBody.getContent().get(MEDIA_TYPE_APPLICATION_X_WWW_FORM_URLENCODED) :
                     requestBody.getContent().get(MEDIA_TYPE_MULTIPART_FORM_DATA);
 
-            for(Object entry : mediaType.getSchema().getProperties().entrySet()) {
+            for (Object entry : mediaType.getSchema().getProperties().entrySet()) {
                 parametersList.add(((Entry<String, Schema>) entry).getKey());
             }
         }
@@ -203,7 +205,7 @@ public class CoverageGatherer {
 
     private void getParameterValueCoverageCriteria(List<CoverageCriterion> criteria, Entry<String, PathItem> currentPathEntry, Entry<HttpMethod, Operation> currentOperationEntry) {
         // iterate over the parameters of that operation
-        if(currentOperationEntry.getValue().getParameters() != null) {
+        if (currentOperationEntry.getValue().getParameters() != null) {
             Iterator<Parameter> parametersIterator = currentOperationEntry.getValue().getParameters().iterator();
 
             while (parametersIterator.hasNext()) {
@@ -233,7 +235,7 @@ public class CoverageGatherer {
         List<String> paramValues = new ArrayList<>(getIndividualSchemaValues(schema));
 
         if (schema instanceof ComposedSchema) {
-            ComposedSchema paramSchema = (ComposedSchema)schema;
+            ComposedSchema paramSchema = (ComposedSchema) schema;
             List<Schema> paramSchemas = paramSchema.getAnyOf() != null ? paramSchema.getAnyOf() : paramSchema.getOneOf();
             if (paramSchemas != null)
                 paramSchemas.forEach(ps -> paramValues.addAll(getSchemaValues(ps)));
@@ -283,8 +285,8 @@ public class CoverageGatherer {
 
     private void getOutputContentTypeCoverageCriteria(List<CoverageCriterion> criteria, Entry<String, PathItem> currentPathEntry, Entry<HttpMethod, Operation> currentOperationEntry) {
         ApiResponse response = null;
-        for(String statusCode : currentOperationEntry.getValue().getResponses().keySet()) {
-            if(statusCode.startsWith("2")) {
+        for (String statusCode : currentOperationEntry.getValue().getResponses().keySet()) {
+            if (statusCode.startsWith("2")) {
                 response = currentOperationEntry.getValue().getResponses().get(statusCode);
                 break;
             }
@@ -321,7 +323,7 @@ public class CoverageGatherer {
         for (Entry<String, ApiResponse> currentResponseEntry : currentOperationEntry.getValue().getResponses().entrySet()) {
 
             // iterate over the media type responses of that ApiResponse
-            if(currentResponseEntry.getValue().getContent() != null) {
+            if (currentResponseEntry.getValue().getContent() != null) {
                 for (Entry<String, MediaType> currentMediaTypeEntry : currentResponseEntry.getValue().getContent().entrySet()) {
                     Schema mediaTypeSchema = currentMediaTypeEntry.getValue().getSchema();
 
@@ -329,7 +331,8 @@ public class CoverageGatherer {
                         addResponseBodyPropertiesCriterion(mediaTypeSchema, criteria,
                                 currentPathEntry.getKey() + "->" +
                                         currentOperationEntry.getKey().toString() + "->" +
-                                        currentResponseEntry.getKey() + "->" // note the final arrow, since new elements will be added to the rootPath
+                                        currentResponseEntry.getKey() + "->", // note the final arrow, since new elements will be added to the rootPath
+                                new HashSet<>()
                         );
                         break;
                     }
@@ -347,16 +350,16 @@ public class CoverageGatherer {
      * all sub-properties of an object.
      *
      * @param mediaTypeSchema OpenAPI property to check if it contains sub-properties to cover
-     * @param criteria List of coverage criteria where to include the RESPONSE_BODY_PROPERTIES criteria
-     * @param baseRootPath Initial rootPath: "{path}->{httpMethod}->{statusCode}->". Example of
-     *                     baseRootPath after 2 iterations: "{path}->{httpMethod}->{statusCode}->{prop1[{prop2"
+     * @param criteria        List of coverage criteria where to include the RESPONSE_BODY_PROPERTIES criteria
+     * @param baseRootPath    Initial rootPath: "{path}->{httpMethod}->{statusCode}->". Example of
+     *                        baseRootPath after 2 iterations: "{path}->{httpMethod}->{statusCode}->{prop1[{prop2"
      */
-    private void addResponseBodyPropertiesCriterion(Schema mediaTypeSchema, List<CoverageCriterion> criteria, String baseRootPath) {
+    private void addResponseBodyPropertiesCriterion(Schema mediaTypeSchema, List<CoverageCriterion> criteria, String baseRootPath, Set<String> previousResponseRef) {
         String rootPathSuffix = "";
         String currentResponseRef = null;
         Map<String, Schema> openApiProperties = null;
 
-        if(mediaTypeSchema instanceof ComposedSchema) {
+        if (mediaTypeSchema instanceof ComposedSchema) {
 //            addResponseBodyPropertiesCriterion(((ComposedSchema) mediaTypeSchema).getAnyOf().get(0), criteria, baseRootPath);
             // TODO: Handle anyOf, oneOf and allOf
             // TODO: Handle better when type == null, which seems to be with allOf
@@ -365,8 +368,8 @@ public class CoverageGatherer {
                 currentResponseRef = mediaTypeSchema.get$ref();
                 rootPathSuffix += "{"; // update rootPathSuffix
             } else if (mediaTypeSchema instanceof ArraySchema && "array".equals(mediaTypeSchema.getType())) { // the response is an array
-                if (((ArraySchema)mediaTypeSchema).getItems().get$ref() != null) { // each item of the array has the schema of the OpenAPI 'ref' tag
-                    currentResponseRef = ((ArraySchema)mediaTypeSchema).getItems().get$ref();
+                if (((ArraySchema) mediaTypeSchema).getItems().get$ref() != null) { // each item of the array has the schema of the OpenAPI 'ref' tag
+                    currentResponseRef = ((ArraySchema) mediaTypeSchema).getItems().get$ref();
                     rootPathSuffix += "[{"; // update rootPathSuffix to reflect depth level inside the response body
                 }
             } else if (mediaTypeSchema.getProperties() != null && "object".equals(mediaTypeSchema.getType())) { // the response is an object and its schema is defined right after
@@ -379,7 +382,7 @@ public class CoverageGatherer {
                 if (currentResponseRef.matches("/properties/.*")) {
                     openApiProperties = spec.getSpecification().getComponents().getSchemas().get(currentResponseRef.replaceAll("/properties/.*", "")).getProperties();
                     Matcher matcher = Pattern.compile("/properties/(.*)").matcher(currentResponseRef);
-                    for(int i=1; matcher.group(i) != null; i++) {
+                    for (int i = 1; matcher.group(i) != null; i++) {
                         openApiProperties = openApiProperties.get(matcher.group(i)).getProperties();
                     }
                 } else {
@@ -388,16 +391,19 @@ public class CoverageGatherer {
                 }
             }
 
-            if (openApiProperties != null) { // if there are properties to cover in this iteration, add new criterion
-                baseRootPath += rootPathSuffix; // update rootPath with the suffix, since a new criterion will be added
-                criteria.add(createCriterion(new ArrayList<>(openApiProperties.keySet()), RESPONSE_BODY_PROPERTIES, baseRootPath));
-                for (Entry<String, Schema> openApiProperty: openApiProperties.entrySet()) { // Recursively add criteria for each property
-                    addResponseBodyPropertiesCriterion(openApiProperty.getValue(), criteria, baseRootPath+openApiProperty.getKey()); // update rootPath with the name of the property
+            if (!previousResponseRef.contains(currentResponseRef)) {
+                previousResponseRef.add(currentResponseRef);
+
+                if (openApiProperties != null) { // if there are properties to cover in this iteration, add new criterion
+                    baseRootPath += rootPathSuffix; // update rootPath with the suffix, since a new criterion will be added
+                    criteria.add(createCriterion(new ArrayList<>(openApiProperties.keySet()), RESPONSE_BODY_PROPERTIES, baseRootPath));
+                    for (Entry<String, Schema> openApiProperty : openApiProperties.entrySet()) { // Recursively add criteria for each property
+                        addResponseBodyPropertiesCriterion(openApiProperty.getValue(), criteria, baseRootPath + openApiProperty.getKey(), previousResponseRef); // update rootPath with the name of the property
+                    }
                 }
             }
         }
     }
-
 
 
     /**
@@ -405,19 +411,19 @@ public class CoverageGatherer {
      * as strings, it transforms it into a Map with Boolean values representing
      * whether that element has been covered or not. All are set to 'false' (no
      * elements covered at the beginning).
-     * 
+     *
      * @param elementsList Elements (only strings) to be included in the criterion
-     * @param type CriterionType of the criterion (PATH, OPERATION, etc.)
-     * @param rootPath Root path of the criterion. This can vary, be composed of
-     * a different number of elements depending on the criterion type
+     * @param type         CriterionType of the criterion (PATH, OPERATION, etc.)
+     * @param rootPath     Root path of the criterion. This can vary, be composed of
+     *                     a different number of elements depending on the criterion type
      * @return CoverageCriterion with all fields set (type, rootPath and elements)
      */
     private CoverageCriterion createCriterion(List<String> elementsList, CriterionType type, String rootPath) {
         CoverageCriterion criterion = new CoverageCriterion(type);
         Map<String, Boolean> elements = elementsList.stream()
                 .collect(Collectors.toMap(
-                    e -> e,
-                    e -> Boolean.FALSE
+                        e -> e,
+                        e -> Boolean.FALSE
                 )); // create Map whose keys are the elements and whose values are 'false'
         criterion.setElements(elements);
         criterion.setRootPath(rootPath); // set rootPath for the criterion (this together with the TYPE conform a unique ID)
@@ -441,5 +447,5 @@ public class CoverageGatherer {
         coverageCriterionTypes.add(RESPONSE_BODY_PROPERTIES);
         coverageCriterionTypes.add(OUTPUT_CONTENT_TYPE);
     }
-    
+
 }

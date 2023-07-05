@@ -38,10 +38,31 @@ public class FuzzingDictionary {
         return getNodeFromValue(value);
     }
 
+    public static JsonNode getNodeFuzzingValueWithFormat(String type, String format) {
+        String value;
+
+        if (format == null) {
+            value = getFuzzingValue(type);
+        } else {
+            List<String> values = fuzzingDict.get(format);
+            if (values != null && !values.isEmpty()) {
+                value = values.get(ThreadLocalRandom.current().nextInt(values.size()));
+            } else {
+//                logger.warn("No fuzzing values for {}", format);
+                value = getFuzzingValue(type);
+            }
+        }
+
+        return getNodeFromValue(value);
+    }
+
+//    private static String getFuzzingValueWithFormat(String type, String format) {
+//    }
+
     public static JsonNode getNodeFromValue(String value) {
         JsonNode node = null;
 
-        if (NumberUtils.isCreatable(value)) {
+        if (NumberUtils.isCreatable(value) && !value.equals("01010101")) {
             Number n = NumberUtils.createNumber(value);
             if (n instanceof Integer || n instanceof Long)
                 node = objectMapper.getNodeFactory().numberNode(n.longValue());

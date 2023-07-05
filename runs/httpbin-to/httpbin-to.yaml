@@ -1,0 +1,35 @@
+openapi: 3.0.3
+
+info:
+  title: HTTPBin
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8082/api4
+    description: Production
+
+paths:
+  /headers:
+    get:
+      summary: Return the incoming request's HTTP headers
+      description: Return the incoming request's HTTP headers
+      operationId: getHeaders
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: string
+  /anything:
+    get:
+      summary: Returns anything passed in request data
+      description: Returns anything passed in request data
+      operationId: getAnything
+      responses:
+        '200':
+          description: successful operation
+          content:
+            application/json:
+              schema:
+                type: string

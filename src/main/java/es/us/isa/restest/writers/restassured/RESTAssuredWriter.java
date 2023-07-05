@@ -285,7 +285,7 @@ public class RESTAssuredWriter implements IWriter {
 //			content += generateResponseValidation(t);
 
 		// Generate all stuff needed after the RESTAssured response validation
-		content += generatePostResponseValidation(t);
+//		content += generatePostResponseValidation(t);
 
 		// Generate the end of the try block, including its corresponding catch
 		content += generateTryBlockEnd();
@@ -428,7 +428,7 @@ public class RESTAssuredWriter implements IWriter {
 		// Validation of nominal and faulty test cases
 		content += "\t\t\t\t.filter(nominalOrFaultyTestCaseFilter)\n";
 //		if (OAIValidation)
-		content += "\t\t\t\t.filter(validationFilter)\n";
+//		content += "\t\t\t\t.filter(validationFilter)\n";
 		if (enableStats || enableOutputCoverage) // CSV filter
 			content += "\t\t\t\t.filter(csvFilter)\n";
 		if (statefulFilter && t.getMethod().equals(HttpMethod.GET)) {

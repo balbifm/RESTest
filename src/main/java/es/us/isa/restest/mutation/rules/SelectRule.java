@@ -25,7 +25,7 @@ public class SelectRule extends PathRule {
         List<String> propertyNames = new ArrayList<>(schema.getProperties().keySet());
         propertyNames.remove(objectChild);
 
-        if(!propertyNames.isEmpty()) {
+        if (!propertyNames.isEmpty()) {
             String selectedProperty = propertyNames.get(random.nextInt(propertyNames.size()));
             for (String propertyName : propertyNames) {
                 if (!selectedProperty.equals(propertyName)) {

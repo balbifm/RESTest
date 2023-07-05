@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.ArraySchema;
+import io.swagger.v3.oas.models.media.ComposedSchema;
 import io.swagger.v3.oas.models.media.Schema;
 
 import java.math.BigDecimal;
@@ -54,8 +55,13 @@ public class SchemaManager {
      * without "ref" attributes).
      */
     public static Schema<?> generateFullyResolvedSchema(Schema<?> schema, OpenAPI spec) {
+        if (schema instanceof ComposedSchema) {
+            schema = ((ComposedSchema)schema).getOneOf().get(0);
+        }
+
         Schema<?> resolvedSchema = resolveSchemaAndUpdateRefPath(schema, spec);
         Schema<?> fullyResolvedSchema;
+
         if ("array".equals(resolvedSchema.getType()))
             fullyResolvedSchema = generateFullyResolvedArraySchema((ArraySchema) resolvedSchema, spec);
         else
@@ -166,7 +172,7 @@ public class SchemaManager {
         } else if (value instanceof Boolean) {
             node = mapper.getNodeFactory().booleanNode((Boolean) value);
         } else {
-            node = mapper.getNodeFactory().textNode((String) value);
+            node = mapper.getNodeFactory().textNode(value.toString());
         }
 
         return node;

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+
 import es.us.isa.restest.inputs.ITestDataGenerator;
 import es.us.isa.restest.mutation.SchemaMutation;
 import es.us.isa.restest.specification.OpenAPISpecification;
@@ -14,6 +15,7 @@ import es.us.isa.restest.util.SchemaManager;
 import io.swagger.v3.oas.models.Operation;
 import io.swagger.v3.oas.models.examples.Example;
 import io.swagger.v3.oas.models.media.ArraySchema;
+import io.swagger.v3.oas.models.media.ComposedSchema;
 import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import org.apache.logging.log4j.LogManager;
@@ -22,8 +24,10 @@ import org.apache.logging.log4j.Logger;
 import java.security.SecureRandom;
 import java.util.*;
 
-import static es.us.isa.restest.inputs.fuzzing.FuzzingDictionary.getNodeFuzzingValue;
+import static es.us.isa.restest.inputs.fuzzing.FuzzingDictionary.getNodeFuzzingValueWithFormat;
 import static es.us.isa.restest.inputs.stateful.DataMatching.getParameterValue;
+import static es.us.isa.restest.mutation.SchemaMutation.MutationPipeline.CHANGE_BODY_PROPERTY_FORMAT;
+import static es.us.isa.restest.mutation.SchemaMutation.MutationPipeline.CHANGE_BODY_PROPERTY_TYPE;
 import static es.us.isa.restest.util.FileManager.checkIfExists;
 import static es.us.isa.restest.util.SchemaManager.resolveSchema;
 import static es.us.isa.restest.specification.OpenAPISpecificationVisitor.MEDIA_TYPE_APPLICATION_JSON_REGEX;
@@ -36,6 +40,11 @@ public class BodyGenerator implements ITestDataGenerator {
     Operation openApiOperation;
     String defaultValue;
     boolean mutate;
+    /**
+     * If mutate is true and this is null, a random mutation is going to happen. If its true and this is not null, the
+     * selected mutation is going to happen
+     */
+    SchemaMutation.MutationPipeline mutation;
 
     String dataDirPath;
     OpenAPISpecification spec;
@@ -63,7 +72,7 @@ public class BodyGenerator implements ITestDataGenerator {
             }
         }
 
-        ObjectNode dictNode = operationPath != null && FileManager.checkIfExists(jsonPath)? (ObjectNode) JSONManager.readJSON(jsonPath) : objectMapper.createObjectNode();
+        ObjectNode dictNode = operationPath != null && FileManager.checkIfExists(jsonPath) ? (ObjectNode) JSONManager.readJSON(jsonPath) : objectMapper.createObjectNode();
         Map.Entry<String, MediaType> mediaTypeEntry = openApiOperation.getRequestBody().getContent().entrySet()
                 .stream().filter(x -> x.getKey().matches(MEDIA_TYPE_APPLICATION_JSON_REGEX)).findFirst().orElse(null);
         MediaType requestBody = null;
@@ -71,18 +80,21 @@ public class BodyGenerator implements ITestDataGenerator {
             requestBody = mediaTypeEntry.getValue();
 
         if (requestBody != null) {
-            Schema mutatedSchema = mutate? new SchemaMutation(requestBody.getSchema(), spec.getSpecification()).mutate() : resolveSchema(requestBody.getSchema(), spec.getSpecification());
-            JsonNode rootNode = null;
-            if ("array".equals(mutatedSchema.getType()))
-                rootNode = objectMapper.createArrayNode();
-            else
-                rootNode = objectMapper.createObjectNode();
+            Schema<?> mutatedSchema = mutate ?
+                    new SchemaMutation(requestBody.getSchema(), spec.getSpecification()).mutate(mutation) :
+                    resolveSchema(requestBody.getSchema(), spec.getSpecification());
+
+            JsonNode rootNode = "array".equals(mutatedSchema.getType()) ?
+                    objectMapper.createArrayNode() :
+                    objectMapper.createObjectNode();
+
             try {
-                generateStatefulObjectNode(dictNode, mutatedSchema, rootNode, "", new ArrayList<>(), true);
+                generateStatefulObjectNode(dictNode, mutatedSchema, rootNode, "", new ArrayList<>(), true, new HashSet<>());
             } catch (RESTestException e) {
-                logger.warn("There isn't enough data to generate a valid request body for {} operation.", operationMethod+operationPath);
+                logger.warn("There isn't enough data to generate a valid request body for {} operation.", operationMethod + operationPath);
                 logger.warn("RESTest will use the default request body specified in the testConf.");
             }
+
             if (rootNode != null) {
                 body = rootNode;
             }
@@ -91,33 +103,51 @@ public class BodyGenerator implements ITestDataGenerator {
         return body;
     }
 
-    private void generateStatefulObjectNode(ObjectNode dictNode, Schema<?> schema, JsonNode rootNode, String prefix, List<String> requiredProperties, boolean firstLevel) throws RESTestException {
+    private void generateStatefulObjectNode(ObjectNode dictNode,
+                                            Schema<?> schema,
+                                            JsonNode rootNode,
+                                            String prefix,
+                                            List<String> requiredProperties,
+                                            boolean firstLevel,
+                                            Set<Schema<?>> prevSchemas)
+            throws RESTestException {
         if (schema.get$ref() != null) {
             schema = spec.getSpecification().getComponents().getSchemas().get(schema.get$ref().substring(schema.get$ref().lastIndexOf('/') + 1));
         }
 
         String resolvedProperty = prefix.substring(prefix.lastIndexOf('.') + 1).replace("-duplicated", "").replace(DOT_CONVERSION, ".");
 
+        if (schema instanceof ComposedSchema) {
+            schema = ((ComposedSchema)schema).getOneOf().get(0);
+        }
+
         if ("".equals(prefix) // First level object
                 || requiredProperties == null && rootNode.isArray() // Array has no req. properties, but generate at least one
                 || (requiredProperties != null && requiredProperties.contains(resolvedProperty)) // Req. property
-                || ((requiredProperties == null || !requiredProperties.contains(resolvedProperty)) && random.nextBoolean())) { // Optional property (50% prob.)
+                || ((requiredProperties == null || !requiredProperties.contains(resolvedProperty))
+                && shouldRandomize(prefix))) { // Optional property (50% prob.)
             JsonNode childNode = null;
             if (schema.getType().equals("object")) {
-                childNode = "".equals(prefix) && firstLevel ? rootNode : objectMapper.createObjectNode();
-
-                if (schema.getProperties() != null) {
-                    for (Map.Entry<String, Schema> entry : schema.getProperties().entrySet()) {
-                        String paramName = entry.getKey().replace(".", DOT_CONVERSION);
-                        String newPrefix = "".equals(prefix) ? prefix + paramName : prefix + '.' + paramName;
-                        generateStatefulObjectNode(dictNode, entry.getValue(), childNode, newPrefix, schema.getRequired(), false);
+                if (!prevSchemas.contains(schema)) {
+                    childNode = "".equals(prefix) && firstLevel ? rootNode : objectMapper.createObjectNode();
+                    prevSchemas.add(schema);
+                    if (schema.getProperties() != null) {
+                        for (Map.Entry<String, Schema> entry : schema.getProperties().entrySet()) {
+                            String paramName = entry.getKey().replace(".", DOT_CONVERSION);
+                            String newPrefix = "".equals(prefix) ? prefix + paramName : prefix + '.' + paramName;
+                            generateStatefulObjectNode(dictNode, entry.getValue(), childNode, newPrefix, schema.getRequired(), false, prevSchemas);
+                        }
                     }
                 }
 
             } else if (schema.getType().equals("array")) {
                 childNode = "".equals(prefix) && firstLevel ? rootNode : objectMapper.createArrayNode();
-                if (schema instanceof ArraySchema && ((ArraySchema) schema).getItems() != null) {
-                    generateStatefulObjectNode(dictNode, ((ArraySchema) schema).getItems(), childNode, prefix, schema.getRequired(), false);
+                if (!prevSchemas.contains(schema)) {
+                    prevSchemas.add(schema);
+
+                    if (schema instanceof ArraySchema && ((ArraySchema) schema).getItems() != null) {
+                        generateStatefulObjectNode(dictNode, ((ArraySchema) schema).getItems(), childNode, prefix, schema.getRequired(), false, prevSchemas);
+                    }
                 }
             } else {
                 String resolvedPrefix = prefix.replace("-duplicated", "").replace(DOT_CONVERSION, ".");
@@ -129,7 +159,7 @@ public class BodyGenerator implements ITestDataGenerator {
 
             if (!"".equals(prefix) || !firstLevel) {
                 if (childNode == null || childNode.isMissingNode()) {
-                    throw new RESTestException();
+//                    throw new RESTestException();
                 } else if (rootNode.isObject()) {
                     ((ObjectNode) rootNode).set(prefix.substring(prefix.lastIndexOf('.') + 1).replace(DOT_CONVERSION, "."), childNode);
                 } else {
@@ -137,6 +167,16 @@ public class BodyGenerator implements ITestDataGenerator {
                 }
             }
         }
+    }
+
+    private boolean shouldRandomize(String resolvedProperty) {
+        if (mutation != null && (mutation.equals(CHANGE_BODY_PROPERTY_FORMAT) || mutation.equals(CHANGE_BODY_PROPERTY_TYPE))) {
+            if (!resolvedProperty.contains(".")) {
+                return true;
+            }
+        }
+
+        return random.nextBoolean();
     }
 
     private JsonNode createNodeFromExample(Schema<?> schema, String prefix) {
@@ -150,7 +190,7 @@ public class BodyGenerator implements ITestDataGenerator {
         //Looking for parameter example
         if (schema.getExample() != null) {
             node = SchemaManager.createValueNode(schema.getExample(), objectMapper);
-        // If there's no parameter example, then it'll look for a request body example
+            // If there's no parameter example, then it'll look for a request body example
         } else if (requestBody != null) {
             Object example = null;
 
@@ -170,7 +210,7 @@ public class BodyGenerator implements ITestDataGenerator {
 
                 while (i < prefixSplit.length) {
                     if (exampleNode.get(prefixSplit[i]) != null) {
-                        candidate = exampleNode.get(prefixSplit[i]).isArray()? exampleNode.get(prefixSplit[i]).get(0) : exampleNode.get(prefixSplit[i]);
+                        candidate = exampleNode.get(prefixSplit[i]).isArray() ? exampleNode.get(prefixSplit[i]).get(0) : exampleNode.get(prefixSplit[i]);
                         exampleNode = exampleNode.get(prefixSplit[i]);
                         i++;
                     } else if (exampleNode.size() == 1 && exampleNode.get(exampleNode.fieldNames().next()).isArray()) {
@@ -196,14 +236,15 @@ public class BodyGenerator implements ITestDataGenerator {
     }
 
     private JsonNode getDefaultValue(Schema<?> schema) {
-        JsonNode node = getNodeFuzzingValue(schema.getType());
+        JsonNode node = getNodeFuzzingValueWithFormat(schema.getType(), schema.getFormat());
 
         // For dates and enums in particular, we may generate valid default values
-        if ("date".equals(schema.getFormat()) && random.nextBoolean()) {
+        if ("date".equals(schema.getFormat())) { //&& random.nextBoolean()) {
             node = objectMapper.getNodeFactory().textNode("2020-01-01");
-        } else if("date-time".equals(schema.getFormat()) && random.nextBoolean()) {
+        } else if ("date-time".equals(schema.getFormat())) { //&& random.nextBoolean()) {
             node = objectMapper.getNodeFactory().textNode("2020-01-01T12:00:00Z");
-        } else if(schema.getEnum() != null && random.nextBoolean()) {
+            return node;
+        } else if (schema.getEnum() != null) { // && random.nextBoolean()) {
             String enumValue = (String) schema.getEnum().get(random.nextInt(schema.getEnum().size()));
             node = objectMapper.getNodeFactory().textNode(enumValue);
         }
@@ -223,6 +264,12 @@ public class BodyGenerator implements ITestDataGenerator {
 
     public String nextValueAsString(boolean mutate) {
         setMutate(mutate);
+        return nextValueAsString();
+    }
+
+    public String nextValueAsString(SchemaMutation.MutationPipeline mutation) {
+        setMutate(true);
+        this.mutation = mutation;
         return nextValueAsString();
     }
 

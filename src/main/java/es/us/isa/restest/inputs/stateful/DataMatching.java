@@ -19,7 +19,7 @@ public class DataMatching {
     private static final Morphology m = new Morphology();
 
     public static JsonNode getParameterValue(ObjectNode dict, String operationMethod, String operationPath, String paramName) {
-        JsonNode paramValue = null;
+        JsonNode paramValue;
         ObjectNode operationDict = (ObjectNode) dict.get(operationMethod + operationPath);
 
         if ("id".equalsIgnoreCase(paramName)) {
@@ -47,14 +47,14 @@ public class DataMatching {
         }
 
         // 4th option: Other operations, similar parameter name
-        if (paramValue == null) {
-            List<JsonNode> paramValues = new ArrayList<>();
-            Iterator<JsonNode> dictIterator = dict.iterator();
-            while (dictIterator.hasNext())
-                paramValues.addAll(getValuesOfSimilarParameterNames((ObjectNode) dictIterator.next(), paramName));
-            if (!paramValues.isEmpty())
-                paramValue = paramValues.get(ThreadLocalRandom.current().nextInt(paramValues.size()));
-        }
+//        if (paramValue == null) {
+//            List<JsonNode> paramValues = new ArrayList<>();
+//            Iterator<JsonNode> dictIterator = dict.iterator();
+//            while (dictIterator.hasNext())
+//                paramValues.addAll(getValuesOfSimilarParameterNames((ObjectNode) dictIterator.next(), paramName));
+//            if (!paramValues.isEmpty())
+//                paramValue = paramValues.get(ThreadLocalRandom.current().nextInt(paramValues.size()));
+//        }
 
         // 5th option: Repeat whole process with sub-property name (e.g., "data.comment.id" -> "comment.id")
         if (paramValue == null && paramName.contains("."))

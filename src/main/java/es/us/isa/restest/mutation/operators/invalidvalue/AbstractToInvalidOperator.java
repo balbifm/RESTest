@@ -31,6 +31,12 @@ public abstract class AbstractToInvalidOperator extends AbstractMutationOperator
     protected static final String VIOLATE_FORMAT_CONSTRAINT = "VIOLATE_FORMAT_CONSTRAINT";
     protected static final String VIOLATE_MAX_LENGTH_CONSTRAINT = "VIOLATE_MAX_LENGTH_CONSTRAINT";
     protected static final String VIOLATE_MIN_LENGTH_CONSTRAINT = "VIOLATE_MIN_LENGTH_CONSTRAINT";
+    protected static final String REPLACE_WITH_DATETIME = "REPLACE_WITH_DATETIME";
+    protected static final String REPLACE_WITH_DATE = "REPLACE_WITH_DATE";
+    protected static final String REPLACE_WITH_INT64 = "REPLACE_WITH_INT64";
+    protected static final String REPLACE_WITH_GT_INT64 = "REPLACE_WITH_GT_INT64";
+    protected static final String REPLACE_WITH_INVALID_FLOAT = "REPLACE_WITH_INVALID_FLOAT";
+    protected static final String REPLACE_WITH_INVALID_DOUBLE = "REPLACE_WITH_INVALID_DOUBLE";
 
     public static String mutate(TestCase tc, OpenAPIParameter param, String[] mutations) {
         String mutationApplied = "";
@@ -106,6 +112,30 @@ public abstract class AbstractToInvalidOperator extends AbstractMutationOperator
                         tc.addParameter(param, RandomStringUtils.randomAlphabetic(param.getMinLength() - 1));
                     }
                     break;
+                case REPLACE_WITH_DATETIME:
+                    mutationApplied = getMutationMessage(mutationsList.get(index), param, tc, null);
+                    tc.addParameter(param, "2017-07-21T17:32:28Z");
+                    break;
+                case REPLACE_WITH_DATE:
+                    mutationApplied = getMutationMessage(mutationsList.get(index), param, tc, null);
+                    tc.addParameter(param, "2017-07-21");
+                    break;
+                case REPLACE_WITH_GT_INT64:
+                    mutationApplied = getMutationMessage(mutationsList.get(index), param, tc, null);
+                    tc.addParameter(param, "9223372036854775808");
+//                    tc.addParameter(param, "92233720368547758080");
+                    break;
+                case REPLACE_WITH_INVALID_FLOAT:
+//                    mutationApplied = getMutationMessage(mutationsList.get(index), param, tc, null);
+//                    tc.addParameter(param, "9223372036854775808");
+                    break;
+                case REPLACE_WITH_INT64:
+                    mutationApplied = getMutationMessage(mutationsList.get(index), param, tc, null);
+                    tc.addParameter(param, "1844674407370955");
+                    break;
+                case REPLACE_WITH_INVALID_DOUBLE:
+//                    mutationApplied = getMutationMessage(mutationsList.get(index), param, tc, null);
+                    break;
                 default:
                     throw new IllegalArgumentException("Mutation not supported: " + mutationsList.get(index));
             }
@@ -135,6 +165,18 @@ public abstract class AbstractToInvalidOperator extends AbstractMutationOperator
                 return "Violated 'max_length' constraint of string parameter " + param.getName();
             case VIOLATE_MIN_LENGTH_CONSTRAINT:
                 return "Violated 'min_length' constraint of string parameter " + param.getName();
+            case REPLACE_WITH_DATETIME:
+                return "Changed value to datetime for " + param.getName();
+            case REPLACE_WITH_DATE:
+                return "Changed value to date for " + param.getName();
+            case REPLACE_WITH_GT_INT64:
+                return "Changed value to greater than int64 for " + param.getName();
+            case REPLACE_WITH_INVALID_FLOAT:
+                return "Changed value to an invalid float for " + param.getName();
+            case REPLACE_WITH_INT64:
+                return "Changed value to int64 for " + param.getName();
+            case REPLACE_WITH_INVALID_DOUBLE:
+                return "Changed value to invalid double for " + param.getName();
             default:
                 throw new IllegalArgumentException("Mutation not supported: " + mutation);
         }

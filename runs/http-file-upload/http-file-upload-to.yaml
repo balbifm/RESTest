@@ -1,0 +1,302 @@
+openapi: 3.0.3
+
+
+# Provide the relevant information of your API here
+info:
+  title: Example API OAS Specification (managed by the Enterprise API GW)
+  version: v1    # Used to indicate the major version (API version) in Anypoint Design Center and Anypoint Exchange. Use 'v' + {majorVersionNumber}. 
+  contact:
+    name: <IT Service supporting the API>              # Example: API Services C4E (ITSVC0005135)
+    email: apiSupportTeam@bp.com                       # Example: apiservicec4e@bp.com
+    url: https://accelerate.bpglobal.com/dac/Create    # URL to learn more about your product/team/service
+  description:
+    |
+    # Overview
+    Example API OAS Specification (managed by the Enterprise API GW)
+    # API Owner
+    IT Service Name (ITSVC0000000)
+    # Contact Us
+    <b>API Ops Team     :</b> Point of Contact Name (email@bp.com)</br>
+    <b>Point of Contact :</b> Point of Contact Name (email@bp.com)</br>
+    <b>Product Owner    :</b> Product Owner Name (email@bp.com)</br>
+    <b>Service Owner    :</b> Service Owner Name (email@bp.com)
+  license:
+    name: Apache 2.0
+    url: http://www.apache.org/licenses/LICENSE-2.0.html
+
+
+# This is the managed API's base path exposed by the Enterprise API GW
+servers:
+  - url: https://httpbin.org
+    description: Production
+
+
+# OAuth2 using BP's AAD is the default security of API managed on the Enterprise API GW.
+# Documentation: https://accelerate.bpglobal.com/dac/Create/Technologies/Platforms/Identity/Single-Sign-On#openid-connect-and-oauth
+security:
+  - bpAadOauth2:  
+      - default
+
+
+# Define tags to categorise your operations
+tags:
+  - name: http
+    description: Everything about http
+
+
+# Example API resources. Use this as reference for your actual API contract design
+paths:
+  /anything:
+    get:
+      tags:
+        - http
+      summary: HTTP Anything GET
+      description: HTTP Anything GET
+      operationId: http-anything-get
+      responses:
+          "200":
+            $ref: "#/components/responses/anything"
+          "400":
+            $ref: "#/components/responses/400"
+          "401":
+            $ref: "#/components/responses/401"
+          "429":
+            $ref: "#/components/responses/429"
+    post:
+      tags:
+        - http
+      summary: HTTP Anything POST
+      description: HTTP Anything POST
+      operationId: http-anything-post
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:     
+                file:            
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          $ref: "#/components/responses/anything"
+        "400":
+          $ref: "#/components/responses/400"
+        "401":
+          $ref: "#/components/responses/401"
+        "429":
+          $ref: "#/components/responses/429"
+
+
+components:
+# Definition of common schemas
+  schemas:
+    # Schema for HTTP400 errors from 'Schema Validation' and 'JWT Validation' policies' violations
+    Error-400:
+      description: HTTP 400 error schema
+      type: object
+      properties:
+        error:
+          type: string
+          description: Type of the error returned
+          example: JWT Token is required.
+      additionalProperties: false
+    
+    # Schema for HTTP401 errors from 'JWT Validation' and 'Rate Limiting SLA based' policies' violations
+    Error-401:
+      description: HTTP 401 error schema
+      type: object
+      properties:
+        error:
+          type: string
+          description: Type of the error returned
+          example: Invalid token.
+      additionalProperties: false
+
+    # Schema for HTTP 429 errors from 'Rate Limiting SLA based' policy violations
+    Error-429:
+      description: HTTP 429 error schema
+      type: object
+      properties:
+        error:
+          type: string
+          description: Type of the error returned
+          example: Too Many Requests
+      additionalProperties: false
+
+
+# Definition of common security schemes
+  securitySchemes:
+    # OAuth2 Security Scheme defined using bp's AAD as the IdP. Edit according to your requirements
+    bpAadOauth2:
+      type: oauth2
+      description: API secured using OAuth2 and BP's AAD as the IdP
+      flows:
+        clientCredentials:
+          tokenUrl: https://login.microsoftonline.com/ea80952e-a476-42d4-aaf4-5457852b0f7e/oauth2/v2.0/token    # This is the AAD token URL for bp's tenant
+          scopes:
+            default: https://api-005-nonprod.bpglobal.com/dev/example-services/v1/.default    # Change this to reflect your own API's scope
+        authorizationCode:
+          authorizationUrl: https://login.microsoftonline.com/ea80952e-a476-42d4-aaf4-5457852b0f7e/oauth2/v2.0/authorize   #This is the AAD Authorize URL for bp's tenant
+          tokenUrl: https://login.microsoftonline.com/ea80952e-a476-42d4-aaf4-5457852b0f7e/oauth2/v2.0/token    # This is the AAD token URL for bp's tenant
+          scopes:
+            default: https://api-005-nonprod.bpglobal.com/dev/example-services/v1/.default    # Change this to reflect your own API's scope
+
+
+# The HTTP request-header fields 'Client-Id' and 'Client-Secret' are mandatory for APIs managed on the Enterprise API GW for 'Rate Limiting' and additional authorization to access the API
+  parameters:
+    Client-Id:
+      name: client_id
+      description: The client id of an client app with an approved contract with the API
+      in: header
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9!@#\$%\^&\*\(\)\-_\+=\[\]\{\}\\\|:;'",\.<>\/\?~`]*$
+      required: true
+      example: d1374b15c6864c3682ddbed2a247a826
+    Client-Secret:
+      name: client_secret
+      description: The client secret of an client app with an approved contract with the API
+      in: header
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9!@#\$%\^&\*\(\)\-_\+=\[\]\{\}\\\|:;'",\.<>\/\?~`]*$
+      required: true
+      example: 4a87fe7e2e43488c927372AEF981F066
+
+
+# The HTTP response-header fields 'X-Ratelimit-Remaining', 'X-Ratelimit-Limit' and 'X-Ratelimit-Reset' are returned by the managed API on the Enterprise API GW (to address OWASP API4:2019 Lack of Resources & Rate Limiting) 
+  headers:
+    Content-Type:
+      description: Content Type HTTP Header
+      schema:
+        type: string
+        pattern: ^[a-zA-Z0-9]+\/[a-zA-Z0-9-+.]+
+      example: application/json
+    X-Ratelimit-Remaining:
+      description: The amount of available quota
+      schema:
+        type: integer
+        example: 5
+    X-Ratelimit-Limit:
+      description: The maximum available requests per window
+      schema:
+        type: integer
+        example: 10
+    X-Ratelimit-Reset:
+      description: The remaining time, in milliseconds, until a new window starts
+      schema:
+        type: integer
+        example: 1000
+
+# Definition of common HTTP responses
+  responses:
+    anything:
+      description: HTTP 200 response for anything resource
+      headers:
+        Content-Type:
+          $ref: "#/components/headers/Content-Type"
+        X-Ratelimit-Remaining:
+          $ref: "#/components/headers/X-Ratelimit-Remaining"
+        X-Ratelimit-Limit:
+          $ref: "#/components/headers/X-Ratelimit-Limit"
+        X-Ratelimit-Reset:
+          $ref: "#/components/headers/X-Ratelimit-Reset"
+      content:
+        application/json:
+          schema:
+            type: string
+
+    400:
+      description: HTTP 400 Error Response
+      headers:
+        Content-Type:
+          $ref: "#/components/headers/Content-Type"
+        X-Ratelimit-Remaining:
+          $ref: "#/components/headers/X-Ratelimit-Remaining"
+        X-Ratelimit-Limit:
+          $ref: "#/components/headers/X-Ratelimit-Limit"
+        X-Ratelimit-Reset:
+          $ref: "#/components/headers/X-Ratelimit-Reset"          
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error-400"
+          examples:
+            jwtTokenRequired:
+              $ref: "#/components/examples/jwtTokenRequired"
+        text/plain; charset=utf-8:
+          schema:
+            type: string
+          examples:
+            schemaValidationFailed:
+              $ref: "#/components/examples/schemaValidationFailed"
+    
+    401:
+      description: HTTP 401 Error Response
+      headers:
+        Content-Type:
+          $ref: "#/components/headers/Content-Type"
+        X-Ratelimit-Remaining:
+          $ref: "#/components/headers/X-Ratelimit-Remaining"
+        X-Ratelimit-Limit:
+          $ref: "#/components/headers/X-Ratelimit-Limit"
+        X-Ratelimit-Reset:
+          $ref: "#/components/headers/X-Ratelimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error-401"
+          examples:
+            invalidToken:
+              $ref: "#/components/examples/invalidToken"
+            invalidCredentials:
+              $ref: "#/components/examples/invalidCredentials"
+    
+    429:
+      description: HTTP 429 Error Response
+      headers:
+        Content-Type:
+          $ref: "#/components/headers/Content-Type"
+        X-Ratelimit-Remaining:
+          $ref: "#/components/headers/X-Ratelimit-Remaining"
+        X-Ratelimit-Limit:
+          $ref: "#/components/headers/X-Ratelimit-Limit"
+        X-Ratelimit-Reset:
+          $ref: "#/components/headers/X-Ratelimit-Reset"
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/Error-429"
+          examples:
+            tooManyRequests:
+              $ref: "#/components/examples/tooManyRequests"
+
+
+# Definition of common examples
+  examples:
+    jwtTokenRequired:
+      summary: JWT Token Required HTTP400 Error Example (JWT Validation Policy)
+      value:
+        error: JWT Token is required.
+    
+    invalidToken:
+      summary: Invalid Token HTTP401 Error Example (JWT Validataion Policy)
+      value: 
+        error: Invalid token
+    
+    invalidCredentials:
+      summary: Invalid Credentials HTTP401 Error Example (Rate-Limiting SLA based Policy)
+      value: 
+        error: Invalid Credentials
+    
+    tooManyRequests:
+      summary: Too many Requests HTTP429 Error Example (Rate-Limiting SLA based Policy)
+      value:
+        error: Too Many Requests
+    
+    schemaValidationFailed:
+      summary: Bad request HTTP400 Error Example (Schema Validation Policy) only for REST APIs
+      value:
+        OAS3 spec does not match REST call - reformat API call or change the OAS3 spec
